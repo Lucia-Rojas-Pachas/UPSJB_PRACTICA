@@ -1,0 +1,122 @@
+---
+title: "s11_grupo6"
+author: "ROJAS PACHAS"
+format: html
+editor: visual
+---
+
+## GRUPO 06:INTEGRANTES
+
+# Cargar e instalar paquetes
+
+```{r}
+install.packages ("tidyverse")
+install.packages ("here")
+install.packages("rio")
+install.packages("gtsummary")
+install.packages("car")
+```
+
+```{r}
+library(tidyverse)
+library(here)
+library(rio)
+library(gtsummary)
+library(car)
+```
+
+## Cargando los datos
+
+```{r}
+datos_cancer <- import (here("data","conoc_actit_factor_cancer_cervical.csv"))
+```
+
+# 1. Regresión logística binaria
+
+### Sobre los datos para esta práctica
+
+El dataset `conoc_actit_factor_cancer_cervical.csv` incluye información de 218 mujeres y contiene variables sociodemográficas, antecedentes gineco-obstétricos y variables relacionadas al conocimiento, actitud y práctica sobre prevención del cáncer de cuello uterino.
+
+El desenlace de interés es la variable `practica`, la cual indica si la práctica preventiva de las participantes fue **correcta** o **incorrecta**. Esto nos permite aplicar una **regresión logística binaria**.
+
+La regresión logística binaria se utiliza cuando el desenlace es dicotómico. En este caso:
+
+-   `"correcta"` (evento)
+
+-   `"incorrecta"` (referencia)
+
+Antes de iniciar, se convierte esta variable a factor y se define el nivel de referencia
+
+```{r}
+datos_cancer <- datos_cancer |> 
+  mutate(practica = relevel(as.factor(practica), ref = "incorrecta"))
+```
+
+## **1.1 Estimando OR con un predictor categórico**
+
+Por ejemplo, evaluaremos la relación entre la práctica preventiva (`practica`) y la actitud (`actitud`), que tiene dos niveles: `positiva` y `negativa`.
+
+```{r}
+datos_cancer <- datos_cancer |> 
+  mutate(actitud = relevel(as.factor(actitud), ref = "negativa"))
+
+modelo_log <- glm(practica ~ actitud,
+                  family = binomial, 
+                  data = datos_cancer)
+
+summary(modelo_log)
+```
+
+Obtener el OR y su IC95%:
+
+```{r}
+exp(coef(modelo_log)[-1])
+exp(confint(modelo_log)[-1, , drop=F])
+```
+
+**1.2 Interpretación del resultado (ejemplo)**
+
+Las mujeres con actitud positiva tienen mayor probabilidad de presentar prácticas preventivas correctas en comparación con aquellas con actitud negativa (OR = 2.15; IC 95%: 1.20, 3.84; p \< 0.01).
+
+**1.3 Regresión con predictor numérico**
+
+Ahora evaluamos la relación entre la edad y la práctica.
+
+```{r}
+odelo_log_edad <- glm(practica ~ edad, family = binomial, data = datos_cancer)
+
+summary(modelo_log_edad)
+exp(coef(modelo_log_edad)[-1])
+exp(confint(modelo_log_edad)[-1, ])
+```
+
+**1.4 Tabla resumen de regresión logística**
+
+```{r}
+theme_gtsummary_language(language = "es")
+
+tabla_log <- datos_cancer |>
+  tbl_uvregression(
+    include = c(edad, actitud, conocimiento, antec_ets),
+    y = practica,
+    method = glm,
+    method.args = list(family = binomial),
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    hide_n = TRUE,
+    add_estimate_to_reference_rows = FALSE,
+    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+    estimate_fun = ~ style_number(.x, digits = 2),
+    label = list(
+      edad ~ "Edad (años)",
+      actitud ~ "Actitud frente al tamizaje",
+      conocimiento ~ "Nivel de conocimiento",
+      antec_ets ~ "Antecedente de ETS"
+    )
+  ) |>
+  bold_labels() |>
+  bold_p(t = 0.05) |>
+  modify_header(estimate = "**OR no ajustado**", p.value = "**Valor P**")
+
+tabla_log
+```
