@@ -1,0 +1,361 @@
+---
+title: "S12_Grupo6"
+author: "Rojas Pachas"
+format: html
+editor: visual
+---
+
+## Grupo 6:
+
+-   Rojas Pachas Lucia
+
+-   Ruíz Ccasa Gean Manuel
+
+-   Huaman Vasquez Takeshi
+
+-   Adrian Llange Rocio
+
+-   Rojas Jesusi Kristy
+
+# Cargar e instalar paquetes
+
+```{r}
+install.packages("performance")
+install.packages("cardx")
+install.packages("broom.helpers")
+```
+
+```{r}
+library(tidyverse) 
+library(here) 
+library(rio) 
+library(gtsummary) 
+library(car) 
+library(survival) 
+library(performance)
+library(cardx)
+library(broom.helpers)
+library("gt")
+library("webshot2")
+
+```
+
+## Cargando los datos
+
+```{r}
+datos_cancer <- import (here("data","conoc_actit_factor_cancer_cervical.csv"))
+```
+
+Un vistazo a los datos
+
+```{r}
+head(datos_cancer)
+```
+
+# 1. Análisis univariado
+
+En esta sección se estimarán los Odds Ratios (OR) de cada variable de manera independiente, es decir, sin ajuste por otras covariables.
+
+Antes de realizar este análisis, es necesario definir las categorías de referencia para las variables categóricas mediante la función `mutate()` en combinación con `relevel()`. Este paso asegura que la interpretación de los OR se haga en relación con la categoría de referencia seleccionada. El resultado se guarda en un nuevo objeto llamado `conoc_actit_1`.
+
+En este caso, se definió como **variable dependiente** o desenlace a `actitud`, la cual fue recodificada para que su categoría de referencia sea `"positiva"`. De este modo, los OR se interpretarán en función de la probabilidad de tener una actitud **no positiva** (por ejemplo, "negativa").
+
+Asimismo, se recodificaron las siguientes variables independientes:
+
+-   `conocimiento`, tomando como referencia la categoría `"alto"`.
+
+-   `n_educacion`, con `"superior"` como referencia.
+
+-   `procedencia`, tomando como referencia la categoría `"urbano"`.
+
+-   `antec_ets`, con referencia `"no"`.
+
+-   `met_anticoncep`, tomando `"no uso"` como categoría de referencia.
+
+```{r}
+conoc_actit_1 <- datos_cancer |> 
+  mutate(
+    actitud = relevel(as.factor(actitud), ref = "positiva"),
+    conocimiento = relevel(as.factor(conocimiento), ref = "alto"),
+    n_educacion = relevel(as.factor(n_educacion), ref = "superior"),
+    procedencia = relevel(as.factor(procedencia), ref = "urbano"),
+    antec_ets = relevel(as.factor(antec_ets), ref = "no"),
+    met_anticoncep = relevel(as.factor(met_anticoncep), ref = "no uso")
+  ) |> 
+  na.omit()
+```
+
+Este objeto (`conoc_actit_1`) será el que se utilizará en los modelos de regresión logística que se aplicarán a continuación, tanto en análisis univariado como multivariado.
+
+Para obtener la tabla con los resultados del análisis univariado, se utiliza la función `tbl_uvregression()`, la cual permite generar tablas con las estimaciones de regresión logística para cada una de las variables incluidas en el análisis. En este caso, se evaluará de manera independiente la asociación entre la variable dependiente `actitud` (referencia: "positiva") y los distintos factores predictivos: `edad`, `conocimiento`, `n_educacion`, `procedencia`, `antec_ets` y `met_anticoncep`.
+
+```{r}
+tabla_reg_log_univ <- conoc_actit_1 |>
+  tbl_uvregression(
+    include = c(edad, conocimiento, n_educacion, procedencia, antec_ets, met_anticoncep),
+    y = actitud,
+    method = glm,
+    method.args = list(family = binomial),
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    hide_n = TRUE,
+    add_estimate_to_reference_rows = FALSE,
+    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+    estimate_fun = ~ style_number(.x, digits = 2),
+    label = list(
+      edad ~ "Edad (años)",
+      conocimiento ~ "Conocimiento sobre cáncer cervical",
+      n_educacion ~ "Nivel educativo",
+      procedencia ~ "Procedencia",
+      antec_ets ~ "Antecedentes de ETS",
+      met_anticoncep ~ "Método anticonceptivo"
+    )
+  ) |>
+  bold_labels() |>
+  bold_p(t = 0.05) |>
+  modify_header(estimate = "**OR no ajustado**", p.value = "**Valor P**")
+```
+
+En esta tabla, los resultados se expresan como odds ratios no ajustados (OR) con sus respectivos intervalos de confianza al 95% y valores p.
+
+```{r}
+tabla_reg_log_univ
+```
+
+Este código generará una tabla con los **Odds Ratios no ajustados**, sus **intervalos de confianza al 95%** y los **valores p**, para evaluar de forma independiente la asociación entre cada predictor y la actitud frente al cáncer de cuello uterino.
+
+```{r}
+tabla_gt <- tabla_reg_log_univ |> as_gt()
+gtsave(tabla_gt, "tabla_reg_log_univ.png")
+```
+
+### **¿Cómo interpretar?**
+
+Para la interpretación de las variables categóricas, se recomienda tener en cuenta los conceptos fundamentales sobre los odds ratios (OR), en particular que un OR \> 1 indica una mayor probabilidad del desenlace (en este caso, actitud *no positiva*), mientras que un OR \< 1 indica una menor probabilidad, siempre en comparación con la categoría de referencia.
+
+En cuanto a la variable numérica `edad`, el OR fue de 1.00 (IC95%: 0.98–1.03; p = 0.948), lo que indica **ausencia de asociación significativa** entre la edad y la actitud frente al cáncer de cuello uterino en este análisis univariado.
+
+Respecto al nivel de **conocimiento sobre cáncer cervical**, se encontró una asociación clara y estadísticamente significativa:
+
+-   Las personas con conocimiento **bajo** tuvieron un OR de 18.20 (IC95%: 8.11–43.89; p \< 0.001), indicando que tienen más de 18 veces la probabilidad de tener una actitud no positiva en comparación con quienes tienen conocimiento alto.
+
+-   Aquellos con conocimiento **medio** también mostraron un riesgo elevado (OR = 2.71; IC95%: 1.26–6.04; p = 0.012).
+
+-   Finalmente, quienes **no conocen** sobre el cáncer cervical presentaron un OR de 11.08 (IC95%: 1.96–86.11; p = 0.009), reforzando la importancia del conocimiento como factor determinante.
+
+    En cuanto al **nivel educativo**, en comparación con quienes tienen educación superior:
+
+-   Las personas con solo **educación primaria** tuvieron un OR de 9.91 (IC95%: 1.42–196.72; p = 0.043),
+
+-   Y aquellas con **educación secundaria**, un OR de 4.82 (IC95%: 2.51–9.52; p \< 0.001).\
+    Ambos resultados muestran una asociación significativa entre menor nivel educativo y actitud no positiva frente al cáncer cervical.
+
+    En relación con la **procedencia**, no se encontró una diferencia estadísticamente significativa entre quienes provienen de zonas rurales y urbanas (OR = 0.88; IC95%: 0.51–1.51; p = 0.633).
+
+Los **antecedentes de enfermedades de transmisión sexual (ETS)** mostraron una tendencia hacia mayor probabilidad de actitud no positiva (OR = 2.51; IC95%: 0.87–7.74), aunque esta asociación **no fue estadísticamente significativa** (p = 0.093).
+
+Finalmente, al analizar el **método anticonceptivo utilizado**, y tomando como referencia a quienes no usaban ningún método:
+
+-   El uso de **ACO (anticonceptivos orales)** se asoció con una **reducción marcada** en la probabilidad de tener una actitud no positiva (OR = 0.08; IC95%: 0.02–0.24; p \< 0.001),
+
+-   Al igual que el uso de **ampolla de 3 meses** (OR = 0.32; IC95%: 0.14–0.72; p = 0.007) y **ampolla mensual** (OR = 0.40; IC95%: 0.18–0.89; p = 0.027).
+
+-   En contraste, el uso de **DIU** (OR = 1.77; p = 0.336) y **implante subdérmico** (OR = 2.15; p = 0.289) no mostraron una asociación estadísticamente significativa.
+
+# 2. Análisis multivariado
+
+Para el análisis de regresión logística multivariada se aplicó una estrategia de **selección automática de variables**, utilizando tres enfoques clásicos: **eliminación hacia atrás** (*backward elimination*), **selección hacia adelante** (*forward selection*) y **selección paso a paso** (*stepwise selection*)
+
+## 2.1 PASOS
+
+## Paso 1. Ajuste del modelo inicial
+
+Se ajustó un modelo de regresión logística binaria que incluye como variable dependiente `actitud` (positiva vs no positiva), y como variables independientes las siguientes: `edad`, `conocimiento`, `n_educacion`, `procedencia`, `antec_ets` y `met_anticoncep`.
+
+```{r}
+var_modelo <- glm(
+  actitud ~ edad + conocimiento + n_educacion + procedencia + 
+    antec_ets + met_anticoncep,
+  data = conoc_actit_1,
+  family = binomial(link = "logit")
+)
+```
+
+## Paso 2
+
+### Paso 2a. Selección de variables con eliminación hacia atrás (Backward elimination)
+
+```{r}
+multi_backward <- step(var_modelo, direction = "backward", trace = FALSE)
+```
+
+### Paso 2b. Selección de variables con selección hacia adelante (Forward selection)
+
+```{r}
+multi_forward <- step(var_modelo, direction = "forward", trace = FALSE)
+```
+
+### Paso 2c. Selección de variables con método paso a paso (Stepwise selection)
+
+```{r}
+multi_stepwise <- step(var_modelo, direction = "both", trace = FALSE)
+```
+
+## Paso 3. Estimación del AIC y comparación de modelos
+
+Los objetos `multi_backward`, `multi_forward` y `multi_stepwise` contienen los modelos finales obtenidos por cada estrategia. A continuación, se puede usar la función `summary()` para examinar qué variables fueron seleccionadas y cuál fue el valor del AIC en cada modelo:
+
+```{r}
+summary(multi_backward)
+summary(multi_forward)
+summary(multi_stepwise)
+```
+
+## 2.1.1 Conclusión
+
+Luego de aplicar tres estrategias de selección automática de variables (eliminación hacia atrás, selección hacia adelante y paso a paso), se observó que tanto la **eliminación hacia atrás** como el método **stepwise (paso a paso)** seleccionaron el mismo conjunto de variables: `conocimiento`, `nivel educativo` y `método anticonceptivo`. Estos modelos también presentaron el menor valor de AIC (231.92), indicando un **mejor ajuste** en comparación con el modelo completo (AIC = 235.94) o el modelo ajustado con todas las variables originales.
+
+En el modelo final seleccionado, las variables que mostraron una asociación estadísticamente significativa con la **actitud positiva frente a la prevención del cáncer cervical** fueron:
+
+-   **Conocimiento bajo**: las mujeres con conocimiento bajo tuvieron **mayores odds de presentar una actitud positiva** frente a la prevención, en comparación con aquellas con conocimiento alto (OR \> 1, p \< 0.001).
+
+-   **Conocimiento medio**: también se asoció positivamente, aunque el valor p fue marginal (p = 0.054).
+
+-   **Nivel educativo – secundaria**: se asoció significativamente con una mayor probabilidad de actitud positiva (p = 0.027).
+
+-   **Uso de anticonceptivos orales (ACO)**: se asoció de manera negativa con la actitud positiva (OR \< 1, p = 0.001), indicando que quienes usaban ACO tenían menores probabilidades de presentar actitud positiva, en comparación con quienes no usaban ningún método anticonceptivo.
+
+    Otras categorías del método anticonceptivo (ampolla, DIU, implante) no mostraron asociaciones significativas.
+
+La variable `edad`, `procedencia` y `antecedentes de ETS`, a pesar de haber sido incluidas en el modelo inicial completo, **no fueron seleccionadas en el modelo final**, al no contribuir significativamente a la explicación del desenlace ni mejorar el ajuste global del modelo (según AIC).
+
+## 2.2 Evaluación de colinealidad
+
+Para complementar el análisis multivariado y asegurar la validez de los estimadores obtenidos, se evaluó la presencia de colinealidad entre las variables independientes incluidas en los modelos finales. La colinealidad puede inflar los errores estándar y afectar la interpretación de los coeficientes.
+
+Este análisis se realizó mediante la función `check_collinearity()` del paquete `performance`, que estima el **Factor de Inflación de la Varianza (VIF)** para cada predictor. Valores de VIF mayores a 5 (o más conservadoramente, mayores a 10) pueden indicar colinealidad preocupante.
+
+```{r}
+performance::check_collinearity(multi_backward, ci = NULL)
+performance::check_collinearity(multi_forward, ci = NULL)
+performance::check_collinearity(multi_stepwise, ci = NULL)
+```
+
+### 2.2.1 Conclusión
+
+Los modelos obtenidos mediante eliminación hacia atrás (*backward elimination*) y selección paso a paso (*stepwise selection*) presentaron valores de VIF bajos, todos por debajo de 1.5, lo que indica una baja colinealidad entre las variables incluidas. Específicamente, las variables *conocimiento*, *nivel educativo* y *método anticonceptivo* mostraron VIFs de 1.47, 1.29 y 1.25 respectivamente, lo cual sugiere que no existe redundancia importante entre ellas.
+
+Por otro lado, el modelo generado mediante selección hacia adelante (*forward selection*) también mostró baja colinealidad, con VIFs ligeramente más altos, pero igualmente dentro de rangos aceptables. En este modelo, *conocimiento* tuvo el VIF más alto (1.62), seguido de *nivel educativo* (1.45) y *método anticonceptivo* (1.41). Aunque estos valores son superiores a los observados en los otros modelos, siguen estando muy por debajo del umbral preocupante (VIF \> 5), por lo que no se considera que haya una colinealidad severa.
+
+En conjunto, estos resultados respaldan la validez de los modelos ajustados y refuerzan la estabilidad de los estimadores obtenidos. Además, la consistencia en los VIF bajos sugiere que las variables seleccionadas aportan información complementaria en la explicación de la actitud frente a la prevención del cáncer cervical.
+
+### 2.2.2 **Modelo final**
+
+Con base en los resultados del ajuste del modelo (AIC = 231.92) y en la evaluación de colinealidad (VIF \< 1.5 para todas las variables), se concluye que el modelo óptimo es el obtenido mediante las técnicas de **eliminación hacia atrás (backward elimination)** o **selección paso a paso (stepwise selection)**, ya que ambos identificaron el mismo conjunto de variables y presentaron mejor desempeño que el modelo generado por selección hacia adelante.
+
+El modelo final incluye tres variables independientes: **nivel de conocimiento sobre cáncer cervical**, **nivel educativo**, y **método anticonceptivo utilizado**. Estas variables serán consideradas en el análisis multivariado definitivo, ya que mostraron asociaciones significativas y baja colinealidad entre sí, lo que contribuye a un modelo parsimonioso y estadísticamente robusto.
+
+# 3. Reporte del análisis univariado y multivariado
+
+Como en las sesiones anteriores, se reportan los resultados del modelo final de regresión logística, presentando las estimaciones tanto del análisis **univariado (no ajustado)** como del análisis **multivariado (ajustado)**.
+
+En el análisis univariado se explora la asociación individual de cada variable independiente con la variable dependiente `actitud`, mientras que en el análisis multivariado se ajustan las asociaciones por las demás variables incluidas en el modelo final.
+
+## **3.1 Tabla de regresión univariada (no ajustada)**
+
+```{r}
+tabla_univ <- conoc_actit_1 |>
+  tbl_uvregression(
+    y = actitud,
+    include = c(conocimiento, n_educacion, met_anticoncep),
+    method = glm,
+    method.args = list(family = binomial),
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    hide_n = TRUE,
+    add_estimate_to_reference_rows = FALSE,
+    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+    estimate_fun = ~ style_number(.x, digits = 2),
+    label = list(
+      conocimiento ~ "Conocimiento sobre cáncer cervical",
+      n_educacion ~ "Nivel educativo",
+      met_anticoncep ~ "Método anticonceptivo"
+    )
+  ) |>
+  bold_labels() |>
+  bold_p(t = 0.05) |>
+  modify_header(estimate = "**OR**", p.value = "**Valor P**")
+```
+
+## **3.2 Tabla de regresión multivariada (ajustada)**
+
+```{r}
+tabla_multi <- glm(
+  actitud ~ conocimiento + n_educacion + met_anticoncep,
+  data = conoc_actit_1,
+  family = binomial(link = "logit")
+) |>
+  tbl_regression(
+    exponentiate = TRUE,
+    conf.int = TRUE,
+    pvalue_fun = ~ style_pvalue(.x, digits = 3),
+    estimate_fun = ~ style_number(.x, digits = 2),
+    label = list(
+      conocimiento ~ "Conocimiento sobre cáncer cervical",
+      n_educacion ~ "Nivel educativo",
+      met_anticoncep ~ "Método anticonceptivo"
+    )
+  ) |>
+  bold_labels() |>
+  bold_p(t = 0.05) |>
+  modify_header(estimate = "**OR**", p.value = "**Valor P**")
+```
+
+## **3.3 Tabla comparativa: univariado vs. multivariado**
+
+Finalmente, se construye una tabla combinada que permite comparar las estimaciones de la regresión univariada y multivariada, mostradas lado a lado mediante la función `tbl_merge()`:
+
+```{r}
+tabla_final <- 
+  tbl_merge(
+    list(tabla_univ, tabla_multi),
+    tab_spanner = c("**Univariado**", "**Multivariado**"))
+```
+
+```{r}
+tabla_final
+```
+
+```{r}
+tabla_gt <- tabla_final |> as_gt()
+gtsave(tabla_gt, "tabla_final.png")
+```
+
+## 3.4 ¿Cómo interpretar?
+
+En el modelo de regresión logística ajustado, **el nivel de conocimiento sobre el cáncer cervical, el nivel educativo y el uso de métodos anticonceptivos** mostraron asociaciones importantes con la actitud favorable hacia la prevención del cáncer de cuello uterino.
+
+Las mujeres con **bajo conocimiento** sobre el cáncer cervical presentaron **odds 9 veces mayores** de tener una actitud favorable frente a la prevención en comparación con aquellas con conocimiento alto (OR = 9.07; IC95%: 3.52–24.75; p \< 0.001). De igual manera, aquellas con **conocimiento medio** también mostraron una tendencia a mayor actitud favorable, aunque el resultado fue marginalmente significativo (OR = 2.25; IC95%: 0.99–5.25; p = 0.054). En cambio, el grupo que **no conocía** sobre el cáncer cervical no mostró una asociación estadísticamente significativa tras el ajuste (OR = 4.42; IC95%: 0.52–45.25; p = 0.175).
+
+Respecto al **nivel educativo**, las participantes con educación secundaria tuvieron una **probabilidad significativamente mayor** de presentar actitud favorable comparadas con aquellas con educación superior (OR = 2.56; IC95%: 1.11–5.97; p = 0.028). Por su parte, el nivel primario no mostró asociación significativa (OR = 3.01; IC95%: 0.33–67.91; p = 0.374), probablemente debido a la amplia dispersión del intervalo de confianza.
+
+En cuanto al **uso de métodos anticonceptivos**, se observó que el uso de **anticonceptivos orales (ACO)** se asoció de manera significativa con **menores odds** de tener una actitud favorable, en comparación con quienes no usaban ningún método (OR = 0.13; IC95%: 0.03–0.41; p = 0.001). No se observaron asociaciones estadísticamente significativas para otros métodos como la ampolla mensual, la de tres meses, el DIU o el implante subdérmico.
+
+```{r}
+# 1. Tabla univariada
+gtsummary::as_gt(tabla_univ) |>
+  gt::gtsave(filename = "tabla_1_univariado.png")
+
+# 2. Tabla multivariada
+gtsummary::as_gt(tabla_multi) |>
+  gt::gtsave(filename = "tabla_2_multivariado.png")
+
+# 3. Tabla combinada
+gtsummary::as_gt(tabla_final) |>
+  gt::gtsave(filename = "tabla_3_final_univ_vs_multi.png")
+
+# 4. Tabla VIF (colinealidad)
+performance::check_collinearity(multi_stepwise) |>
+  gt::gt() |>
+  gt::gtsave(filename = "tabla_4_colinealidad.png")
+```

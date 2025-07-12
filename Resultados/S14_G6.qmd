@@ -1,0 +1,330 @@
+---
+title: "S14_G6"
+author: "Rojas Pachas"
+format: html
+editor: visual
+---
+
+## Grupo 6:
+
+-   Rojas Pachas Lucia
+
+-   Ruíz Ccasa Gean Manuel
+
+-   Huaman Vasquez Takeshi
+
+-   Adrian Llange Rocio
+
+-   Rojas Jesusi Kristy
+
+    # **Instalar y cargar los paquetes**
+
+```{r}
+install.packages("mice")
+install.packages("ggmice")
+```
+
+```{r}
+library(mice)
+library(tidyverse)
+library(here)
+library(rio)
+library(ggmice)
+library(gtsummary)
+```
+
+# **1. Datos perdidos en investigación en salud**
+
+En las investigaciones en salud, es frecuente encontrarse con datos incompletos. Por ejemplo, en estudios realizados mediante encuestas, como el presente, es posible que algunas participantes no respondan determinadas preguntas por diversos motivos: desconocimiento, incomodidad, omisión involuntaria o incluso errores durante la digitación o recolección de la información. Esto puede generar registros con información faltante o inconsistente.
+
+Cuando se aplican métodos estadísticos como regresión o análisis multivariado, una práctica común consiste en eliminar las observaciones que contienen datos faltantes. Este procedimiento se conoce como **análisis de casos completos**, y es el enfoque predeterminado en muchos programas estadísticos. Sin embargo, al hacerlo se pierde información valiosa y se puede introducir sesgo si los datos faltantes no ocurren completamente al azar.
+
+# **2. Imputación de datos**
+
+Para preservar la mayor cantidad posible de información y mejorar la precisión de los análisis, es recomendable aplicar técnicas de **imputación**. Estas técnicas buscan estimar y reemplazar los valores perdidos utilizando información disponible en otras variables del conjunto de datos.
+
+Si bien en el pasado se empleaban métodos simples como el reemplazo por la media o la moda, estos enfoques tienden a subestimar la variabilidad y pueden distorsionar relaciones estadísticas. Actualmente, se recomienda el uso de métodos más robustos como la **imputación múltiple**, que tiene en cuenta la incertidumbre inherente al proceso de estimación y proporciona resultados más confiables.
+
+# **3. El dataset para este ejercicio**
+
+En este ejercicio trabajaremos con un conjunto de datos que incluye información de 218 mujeres encuestadas. El cuestionario recoge variables sociodemográficas (edad, estado civil, nivel educativo, religión, etnia, ocupación, entre otras), antecedentes personales y sexuales (edad de inicio de relaciones sexuales, número de parejas sexuales, número de hijos, uso de métodos anticonceptivos, ETS previas), y dimensiones clave del enfoque KAP (conocimiento, actitud y práctica frente al cáncer de cuello uterino).
+
+cargando datos
+
+```{r}
+data_sm <- import (here("data","conoc_actit_factor_cancer_cervical_incomp.csv"))
+```
+
+Un vistazo a los datos
+
+```{r}
+head(data_sm)
+```
+
+# 4.Realizando la imputación de datos
+
+## 4.1 ¿Donde estan los valores perdidos?
+
+Es importante saber en qué variables se encuentran los datos antes de iniciar la inputación. Una forma rápida es usando la función `colSums()` es `is.na()`.
+
+```{r}
+colSums(is.na(data_sm))
+```
+
+Incluso mejor, podemos visualizar los datos perdidos en un mapa de calor usando la función `plot_pattern()` de **ggmice**.
+
+```{r}
+data_sm |>
+  select(
+    edad,
+    n_educacion,
+    edad_relacion_sexual,
+    parejas_sex,
+    conocimiento,
+    actitud,
+    practica
+  ) |>
+  ggmice::plot_pattern(
+    square = TRUE,
+    rotate = TRUE
+  )
+```
+
+El número total de valores perdidos en el dataset es de 52.
+
+Se identificaron varios patrones de ausencia. En al menos **6 registros**, se observa más de una variable con datos faltantes simultáneamente, lo que indica que el mecanismo de pérdida podría no ser completamente aleatorio. Esta distribución resalta la necesidad de aplicar una técnica robusta de imputación antes de realizar análisis multivariados.
+
+## 4.2 Comparación de participantes con y sin valores perdidos
+
+Una buena práctica antes de proceder con la imputación de datos es evaluar si existen diferencias significativas entre las participantes que presentan datos faltantes y aquellas con información completa. Este análisis es crucial, ya que puede darnos indicios sobre la naturaleza de los datos faltantes y ayudarnos a decidir si es apropiado utilizar un análisis de casos completos o si es necesario aplicar técnicas de imputación.
+
+¿Cómo se hace esto? Si la distribución de otras variables relevantes no muestra diferencias significativas entre los grupos con y sin datos faltantes, entonces el impacto de las ausencias puede ser mínimo, y podría considerarse seguro trabajar solo con los casos completos. Por el contrario, si se detectan diferencias, esto sugiere que los datos no están ausentes completamente al azar y que eliminar observaciones podría introducir sesgo.
+
+Evaluaremos este aspecto en nuestro dataset, enfocándonos en las variables que presentan mayor cantidad de valores perdidos: `parejas_sex` y `edad_relacion_sexual`.
+
+```{r}
+# Tabla para edad_relacion_sexual
+tabla_edad_rel = data_sm |>
+  select(
+    edad,
+    n_educacion,
+    conocimiento,
+    actitud,
+    practica,
+    edad_relacion_sexual
+  ) |>
+  mutate(missing = factor(
+    is.na(edad_relacion_sexual),
+    levels = c(FALSE, TRUE),
+    labels = c("Sin valores perdidos", "Con valores perdidos")
+  )) |>
+  tbl_summary(
+    by = missing,
+    statistic = list(
+      all_continuous()  ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  ) |>
+  modify_header(label = "**Variable**",
+                all_stat_cols() ~ "**{level}**<br>N = {n} ({style_percent(p, digits=1)}%)") |>
+  modify_caption("Características según valores perdidos en 'edad_relacion_sexual'") |>
+  bold_labels()
+
+# Tabla para parejas_sex
+tabla_parejas = data_sm |>
+  select(
+    edad,
+    n_educacion,
+    conocimiento,
+    actitud,
+    practica,
+    parejas_sex
+  ) |>
+  mutate(missing = factor(
+    is.na(parejas_sex),
+    levels = c(FALSE, TRUE),
+    labels = c("Sin valores perdidos", "Con valores perdidos")
+  )) |>
+  tbl_summary(
+    by = missing,
+    statistic = list(
+      all_continuous()  ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    )
+  ) |>
+  modify_header(label = "**Variable**",
+                all_stat_cols() ~ "**{level}**<br>N = {n} ({style_percent(p, digits=1)}%)") |>
+  modify_caption("Características según valores perdidos en 'parejas_sex'") |>
+  bold_labels()
+
+# Combinar ambas tablas
+tabla <- tbl_merge(
+  tbls = list(tabla_edad_rel, tabla_parejas),
+  tab_spanner = c("**Edad de inicio sexual**", "**Número de parejas sexuales**")
+)
+```
+
+```{r}
+tabla
+
+```
+
+Se puede observar que el **promedio y la desviación estándar de algunas variables difieren** entre el grupo de participantes con datos completos y aquellos con valores perdidos. Esta variación sugiere que los datos faltantes podrían no estar completamente al azar (MCAR), lo cual **refuerza la necesidad de aplicar técnicas de imputación** en lugar de limitarse al análisis de casos completos, ya que este último podría introducir sesgo en los resultados.
+
+## 4.3 ¿Qué variables debo incluir en el proceso de imputación?
+
+Es importante incluir en el modelo de imputación **todas las variables que serán utilizadas en los análisis posteriores**, incluso aquellas que no presentan valores faltantes. Esto se debe a que el modelo de imputación debe ser **tan completo como el análisis final** que se desea realizar. De lo contrario, se corre el riesgo de perder información valiosa que podría mejorar la calidad de las estimaciones.
+
+Además, aunque algunas variables estén completamente observadas, su inclusión es útil porque pueden **aportar información predictiva** que mejora la estimación de los valores faltantes en otras variables.
+
+También es fundamental asegurarse de que las variables categóricas estén definidas como factores, ya que los algoritmos de imputación requieren esta estructura para tratarlas adecuadamente.
+
+A continuación, se muestra un ejemplo de cómo seleccionar las variables relevantes y transformar la variable `conocimiento` (como ejemplo de variable categórica) en un factor antes de la imputación:
+
+```{r}
+input_data = data_sm |>
+  dplyr::select(
+    edad,
+    n_educacion,
+    conocimiento,
+    actitud,
+    practica,
+    edad_relacion_sexual,
+    parejas_sex
+  ) |>
+  mutate(
+    conocimiento = as.factor(conocimiento))
+```
+
+## 4.4 La función `mice()` para imputar datos
+
+Para llevar a cabo la imputación de los datos faltantes, utilizaremos la función `mice()` del paquete del mismo nombre. Esta función permite generar múltiples conjuntos de datos imputados, lo cual mejora la precisión y la validez de los análisis estadísticos posteriores.
+
+Entre los argumentos más importantes de la función se encuentran:
+
+-   `m`: el número de conjuntos de datos imputados que se desean generar,
+
+-   `seed`: una semilla numérica que permite **reproducir los resultados**, y
+
+-   `method`: el método de imputación que se aplicará a cada variable.
+
+Respecto a este último punto, usaremos el método `"pmm"` (*predictive mean matching*) para variables continuas, y `"logreg"` para variables binarias. Para aquellas variables que **no presentan valores perdidos**, simplemente se especifica comillas vacías (`""`) en la lista de métodos.
+
+```{r}
+names(input_data)
+```
+
+El método de imputación la indicaremos con el argumento `method` en el mismo orden que aparecen las variables en el dataset.
+
+```{r}
+data_imputada =
+  mice(
+    input_data,
+    m = 20,
+    method = c(
+      "",        # edad (completa)
+      "",        # n_educacion (completa)
+      "",        # conocimiento (completa)
+      "",        # actitud (completa)
+      "",        # practica (completa)
+      "pmm",     # edad_relacion_sexual (continua con NA)
+      "pmm"      # parejas_sex (continua con NA)
+    ),
+    maxit = 20,
+    seed = 3,
+    print = FALSE
+  )
+```
+
+```{r}
+data_imputada
+```
+
+# 5 Analizando los datos imputados
+
+Antes de proceder con análisis adicionales utilizando el conjunto de datos imputado, es fundamental **explorar visualmente los datos imputados**. Idealmente, los valores generados mediante imputación deben ser **plausibles y consistentes** en relación con los valores originalmente observados.
+
+Una forma útil de hacerlo es mediante un **gráfico de cajas y bigotes** que compare la distribución de los valores imputados (a través de las 20 imputaciones) con la distribución de los datos observados.
+
+A continuación, se presenta este tipo de gráfico para la variable `parejas_sex`:
+
+```{r}
+ggmice(data_imputada, aes(x = .imp, y = parejas_sex)) +
+  geom_jitter(height = 0, width = 0.25) +
+  geom_boxplot(width = 0.5, size = 1, alpha = 0.55, outlier.shape = NA) +
+  labs(
+    x = "Número de imputación",
+    y = "Número de parejas sexuales",
+    title = "Distribución de valores imputados vs observados"
+  )
+```
+
+para `edad_relación_sexual`:
+
+```{r}
+ggmice(data_imputada, aes(x = .imp, y = edad_relacion_sexual)) +
+  geom_jitter(height = 0, width = 0.25) +
+  geom_boxplot(width = 0.5, size = 1, alpha = 0.55, outlier.shape = NA) +
+  labs(
+    x = "Número de imputación",
+    y = "Edad de la primera relación sexual",
+    title = "Distribución de valores imputados vs observados"
+  )
+```
+
+```{r}
+data_imputada_l <- complete(data_imputada, "long", include = TRUE)
+```
+
+Ahora la tabla.
+
+```{r}
+data_imputada_l <- complete(data_imputada, action = "long", include = TRUE)
+
+# Marcar qué observaciones son imputadas
+data_imputada_l <- data_imputada_l %>% 
+  mutate(imputed = .imp > 0,
+         imputed = factor(imputed,
+                          levels = c(FALSE, TRUE),
+                          labels = c("Observado", "Imputado")))
+
+# Crear tabla de proporciones para la variable categórica 'practica'
+prop.table(
+  table(data_imputada_l$practica, data_imputada_l$imputed),
+  margin = 2
+)
+```
+
+## 5.1 Procedimientos adicionales luego de la imputación
+
+El procedimiento estándar para realizar un análisis de regresión luego de la imputación consiste en utilizar la función `with()` para ajustar el modelo directamente al objeto imputado (`data_imputada`). Luego, si se desea obtener los resultados combinados (por ejemplo, para estimaciones o intervalos de confianza), se emplea la función `pool()`.
+
+Sin embargo, cuando se utiliza el paquete **`gtsummary`**, este se encarga internamente de combinar las imputaciones de manera correcta, por lo que únicamente es necesario el uso de `with()` para aplicar el modelo sobre los datos imputados.
+
+A continuación, se presenta un ejemplo de **regresión logística multivariada**, en la que se evalúa la asociación entre diversas variables y la variable `practica`
+
+```{r}
+tabla_multi <- 
+  with(data_imputada,
+       glm(I(practica == "correcta") ~ edad + edad_relacion_sexual + parejas_sex +
+             n_educacion + actitud + conocimiento,
+           family = binomial(link = "logit"))
+  ) |>
+  tbl_regression(
+    exponentiate = TRUE,
+    label = list(
+      edad ~ "Edad",
+      edad_relacion_sexual ~ "Edad de la primera relación sexual",
+      parejas_sex ~ "Número de parejas sexuales",
+      n_educacion ~ "Nivel educativo",
+      actitud ~ "Actitud frente a la prevención",
+      conocimiento ~ "Conocimiento sobre salud sexual"
+    )
+  ) |>
+  bold_p(t = 0.05) |>
+  modify_header(estimate = "**OR ajustado**", p.value = "**p valor**")
+```
+
+```{r}
+tabla_multi
+```
