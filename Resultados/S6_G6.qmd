@@ -1,0 +1,128 @@
+---
+title: "PC2 Actividad 1 Grupo 6"
+author: "Rojas Pachas"
+format: html
+editor: visual
+---
+
+# Grupo 6:
+
+**Integrantes:**
+
+-   Huaman Vasquez Takeshi
+
+-   Rojas Pachas Lucia
+
+-   Ruiz Ccasa Gean
+
+-   Rojas Jesusi Kirsty Nicole
+
+-   Adrian Llange Rocio Isabel
+
+**Instalar y/o Cargar paquetes a utilizar para el cálculo de análisis de poder estadístico**
+
+```{r}
+install.packages("epiR")
+```
+
+```{r}
+library(epiR)
+```
+
+# 1.Estudio de prevalencia
+
+## **Fatiga Relacionada al Cáncer (FRC)**
+
+Un equipo de investigadores desea determinar la frecuencia de **Fatiga Relacionada al Cáncer (FRC)** en niños, niñas y adolescentes oncológicos o sobrevivientes de cáncer, los estudios previos muestran una prevalencia estimada cercana al ***30%. (Py= 0.30)***, margen de error relativo del 20% (epsilon = 0.20), nivel de confianza del 95% (conf.level = 0.95), y sensibilidad/especificidad asumidas como perfectas (se = 1, sp = 1).
+
+**DOI** <https://doi.org/10.51230/ri.v17i2.94>
+
+```{r}
+epi.sssimpleestb(N = NA, Py = 0.30, 
+                 epsilon = 0.20, error = "relative", 
+                 se = 1, sp = 1, 
+                 nfractional = FALSE, conf.level = 0.95)
+```
+
+**Resultado:** Para estimar la prevalencia de Fatiga Relacionada al Cáncer con un 95% de confianza y un error relativo del 20%, se requiere un **tamaño mínimo de muestra de 225 participantes**, este cálculo asume una población lo suficientemente grande, y que se cuenta con instrumentos válidos y confiables para la medición del síntoma.
+
+## **Trastornos de la Conducta Alimentaria (TCA) en estudiantes de Medicina**
+
+Con el objetivo de estimar la prevalencia de **Trastornos de la Conducta Alimentaria (TCA) en estudiantes de Medicina del Perú durante la pandemia de COVID-19**, un equipo de investigadores tomó como base una prevalencia esperada del ***12,5% (Py = 0.125),*** extraída de estudios previos realizados en poblaciones universitarias similares
+
+**DOI:** <https://doi.org/10.1016/j.rcp.2022.07.005>
+
+```{r}
+epi.sssimpleestb(N = NA, Py = 0.125, 
+                 epsilon = 0.20, error = "relative", 
+                 se = 1, sp = 1, 
+                 nfractional = FALSE, conf.level = 0.95)
+
+```
+
+**Resultado:** Con base en una proporción esperada del 12,5% para la presencia de trastornos de la conducta alimentaria, y considerando un nivel de certeza del 95% junto con una tolerancia de error relativa del 20%, se determinó que el estudio requería al menos **673 estudiantes** para lograr una estimación estadísticamente sólida.
+
+# 2. Estudio de cohorte
+
+## Recaída de LLA (Leucemia linfocitica aguda)
+
+Investigadores desean evaluar el efecto del tratamiento experimental CICLET frente al tratamiento estándar BFM **sobre el riesgo de mortalidad** en pacientes pediátricos con LLA en recaída de alto riesgo. Se busca determinar el tamaño de muestra necesario para detectar una razón de riesgo de muerte observada en el ensayo clínico, con un poder estadístico del 80% y un nivel de significancia del 5%.
+
+**DOI:** <http://doi.org/10.51987/revhospitalbaires.v44i1.256> (Tabla 4)
+
+-   ***Pregunta:*** ¿Cuál sería el tamaño de muestra necesario para los grupos de expuestos
+
+```{r}
+epi.sscohortt(irexp1 = 55/57, irexp0 = 27/35, FT = 3, n = NA, 
+              power = 0.80, r = 1, design = 1, sided.test = 2, 
+              nfractional = FALSE, conf.level = 0.95)
+```
+
+**Resultado:** Para evaluar el impacto del tratamiento CICLET frente a BFM en la mortalidad de pacientes pediátricos con recaída de LLA, se requerirían **al menos 492 pacientes por grupo *(expuestos y no expuestos con total de 948****),* suponiendo un seguimiento de 3 años (mencionado en el articulo), un poder estadístico del 80% y un nivel de confianza del 95%.
+
+# 3. Estudio de casos y controles
+
+## **Complicaciones marterno-perinatales asociadas al embarazo adolescente: Distocia funicular en gestantes adolescentes**
+
+Investigadores se propusieron evaluar si el embarazo adolescente representa un factor de riesgo para la presencia de **distocia funicular** durante el parto ***(Adolescentes / adultas)***. Para ello, se plantea un **estudio de casos y controles** no apareados, basado en los resultados de un estudio observacional realizado en el Hospital San Juan de Lurigancho (Lima, Perú), publicado en la *Revista Internacional de Salud Materno Fetal*
+
+**DOI:** <https://doi.org/10.47784/rismf.2023.8.4.200>
+
+**Pregunta:** ¿Cuál sería el tamaño de muestra necesario para los grupos de expuestos, **casos** (gestantes adolescentes con distocia funicular) , **controles** (gestantes adultas sin distocia funicular).
+
+**(Tabla 3)**
+
+```{r}
+epi.sscc(OR = 3.21, p1 = 21/74, 
+         p0 = 10/86, n = NA, 
+         power = 0.80, r = 1, 
+          design = 1, 
+         sided.test = 2, conf.level = 0.95, 
+         method = "unmatched", nfractional = FALSE, 
+         fleiss = FALSE)
+```
+
+**Resultados:** Bajo los supuestos establecidos, se concluye que para evaluar con rigurosidad estadística la asociación entre embarazo adolescente y distocia funicular (OR = 3.21), se requeriría una muestra mínima de **156 participantes**, distribuidos equitativamente entre **78 casos y 78 controles**. Este tamaño de muestra asegura una probabilidad del 80% de detectar una diferencia real, si existe, con un error alfa del 5% (prueba bilateral).
+
+# **4.Cálculo de poder estadístico**
+
+## Prevalencia y factores del trastorno de conducta alimentaria en estudiantes de medicina humana del perú en el contexto de la pandemia de covid-19
+
+Se desea evaluar el Se planea incluir a **386 estudiantes que hacen dieta** y a **837 estudiantes que no hacen dieta**, con el objetivo de detectar una **razón de incidencia (riesgo relativo) de aproximadamente 2.39**, utilizando un nivel de significancia de 0.05.
+
+Datos preliminares indican que, entre los niños que **hacen dieta**, el 38.8% tienen riesgo de TCA (150 de 386), mientras que entre los que **no hacen dieta**, el 16.25% estan en riesgo de TCA (136 de 837). Estos valores se utilizaron para estimar el poder del estudio.
+
+**Pregunta:** ¿Cuál es el poder estadístico con el tamaño de muestra propuesto para cada grupo?
+
+DOI: <https://doi.org/10.1016/j.rcp.2022.07.005>
+
+**(Tabla2)**
+
+```{r}
+
+epi.sscohortt(irexp1 =150/386 , irexp0 = 136/837, FT =  , n = 1224, 
+              power = NA, r = 1, design = 1, sided.test = 2, 
+              nfractional = FALSE, conf.level = 0.95)
+```
+
+**Resultado:** Tendremos un poder estadístico del **100% para rechazar correctamente la hipótesis nula**, lo que indica que el estudio posee una capacidad óptima para detectar la diferencia esperada entre los grupos. Este resultado se basa en un tamaño muestral total de 1,224 participantes, distribuidos equitativamente entre el grupo expuesto (n = 612) y el no expuesto (n = 612).
